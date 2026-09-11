@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { currentPlayer, demoGroups, demoMatches } from '@/data/demo';
+import { currentPlayer, demoGroups, demoMatches, guestPlayer } from '@/data/demo';
 import { applyFeedUpdate, applyMatchResult, clearDemoStore, readDemoStore, writeDemoStore, type Notice } from '@/lib/demo-store';
 import {
   isFeedFresh,
@@ -10,11 +10,12 @@ import {
   normalizeInviteCode,
 } from '@/lib/leaguepedia';
 import { fetchLiveSchedule } from '@/lib/schedule';
+import { pushSchedule } from '@/lib/schedule-sync';
 import { getWinnerId, isPredictionLocked, validSeriesScore } from '@/lib/scoring';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-import type { Group, Match, Player, Prediction, Team } from '@/types';
+import type { Group, Match, Player, Prediction } from '@/types';
 
-type AuthResult = { error?: string };
+type AuthResult = { error?: string; pending?: boolean };
 
 type AppContextValue = {
   user: User | null;
@@ -35,7 +36,7 @@ type AppContextValue = {
   createGroup: (name: string) => Promise<AuthResult & { code?: string }>;
   joinGroup: (code: string) => Promise<AuthResult>;
   settleMatch: (matchId: string, scoreA: number, scoreB: number) => Promise<AuthResult>;
-  updateUsername: (username: string) => AuthResult;
+  updateUsername: (username: string) => Promise<AuthResult>;
   resetDemo: () => void;
   syncMatches: (force?: boolean) => Promise<void>;
   feedStatus: 'idle' | 'loading' | 'live' | 'cached' | 'error';
@@ -45,40 +46,20 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const asTeam = (row: Record<string, unknown>): Team => ({
-  id: String(row.id),
-  name: String(row.name),
-  shortName: String(row.short_name),
-  color: String(row.color ?? '#C7F43D'),
-  region: String(row.region ?? 'INT'),
-});
-
-function asMatch(row: Record<string, unknown>): Match {
-  const teamA = row.team_a as Record<string, unknown>;
-  const teamB = row.team_b as Record<string, unknown>;
-  return {
-    id: String(row.id),
-    competitionId: String(row.competition_id),
-    stage: String(row.stage ?? 'Saison régulière'),
-    startsAt: String(row.starts_at),
-    bestOf: Number(row.best_of),
-    teamA: asTeam(teamA),
-    teamB: asTeam(teamB),
-    scoreA: row.score_a == null ? null : Number(row.score_a),
-    scoreB: row.score_b == null ? null : Number(row.score_b),
-    status: row.status as Match['status'],
-  };
+function asGroups(data: unknown): Group[] {
+  if (Array.isArray(data)) return data as Group[];
+  return [];
 }
 
 export function AppProvider({ children }: React.PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
   const [matches, setMatches] = useState<Match[]>(demoMatches);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [groups, setGroups] = useState<Group[]>(demoGroups);
-  const [localPlayer, setLocalPlayer] = useState<Player>(currentPlayer);
+  const [groups, setGroups] = useState<Group[]>(isSupabaseConfigured ? [] : demoGroups);
+  const [localPlayer, setLocalPlayer] = useState<Player>(isSupabaseConfigured ? guestPlayer : currentPlayer);
   const [remotePlayer, setRemotePlayer] = useState<(Player & { isAdmin?: boolean }) | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [demoReady, setDemoReady] = useState(isSupabaseConfigured);
+  const [demoReady, setDemoReady] = useState(false);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [feedStatus, setFeedStatus] = useState<'idle' | 'loading' | 'live' | 'cached' | 'error'>('idle');
   const [feedUpdatedAt, setFeedUpdatedAt] = useState<string | null>(null);
@@ -89,24 +70,21 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   const clearNotice = useCallback(() => setNotice(null), []);
 
   const refresh = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !user) {
+      if (!user) {
+        setPredictions([]);
+        setGroups(isSupabaseConfigured ? [] : snapshot.current.groups);
+        setRemotePlayer(null);
+      }
+      return;
+    }
 
-    const [matchesResult, predictionsResult, groupsResult, statsResult] = await Promise.all([
-      supabase
-        .from('matches')
-        .select('*, team_a:teams!matches_team_a_id_fkey(*), team_b:teams!matches_team_b_id_fkey(*)')
-        .order('starts_at', { ascending: true })
-        .limit(400),
-      user
-        ? supabase.from('predictions').select('*').eq('user_id', user.id)
-        : Promise.resolve({ data: [], error: null }),
-      user ? supabase.rpc('get_my_groups') : Promise.resolve({ data: [], error: null }),
-      user ? supabase.rpc('get_my_stats') : Promise.resolve({ data: null, error: null }),
+    const [predictionsResult, groupsResult, statsResult] = await Promise.all([
+      supabase.from('predictions').select('*').eq('user_id', user.id),
+      supabase.rpc('get_my_groups'),
+      supabase.rpc('get_my_stats'),
     ]);
 
-    if (matchesResult.data?.length) {
-      setMatches(matchesResult.data.map((row) => asMatch(row as Record<string, unknown>)));
-    }
     if (predictionsResult.data) {
       setPredictions(
         predictionsResult.data.map((row) => ({
@@ -121,25 +99,37 @@ export function AppProvider({ children }: React.PropsWithChildren) {
         })),
       );
     }
-    if (groupsResult.data?.length) setGroups(groupsResult.data as Group[]);
+    setGroups(asGroups(groupsResult.data));
     if (statsResult.data) setRemotePlayer(statsResult.data as unknown as Player & { isAdmin?: boolean });
   }, [user]);
 
   const syncMatches = useCallback(async (force = false) => {
-    if (isSupabaseConfigured) {
-      await refresh();
-      return;
-    }
     const cache = readFeedCache();
     if (cache) {
       const next = applyFeedUpdate(snapshot.current, cache.matches);
       setMatches(next.matches);
-      setPredictions(next.predictions);
-      setGroups(next.groups);
-      setLocalPlayer(next.player);
+      if (!isSupabaseConfigured) {
+        setPredictions(next.predictions);
+        setGroups(next.groups);
+        setLocalPlayer(next.player);
+      }
       setFeedUpdatedAt(cache.fetchedAt);
       setFeedStatus(isFeedFresh(cache.fetchedAt) ? 'live' : 'cached');
-      if (!force && isFeedFresh(cache.fetchedAt)) return;
+      if (!force && isFeedFresh(cache.fetchedAt)) {
+        if (user) {
+          try {
+            await pushSchedule(cache.matches);
+            await refresh();
+          } catch (error) {
+            notify({
+              kind: 'error',
+              title: 'Sync ligue',
+              message: error instanceof Error ? error.message : 'Impossible d’aligner le calendrier en ligne.',
+            });
+          }
+        }
+        return;
+      }
     }
     setFeedStatus('loading');
     try {
@@ -149,11 +139,17 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       writeFeedCache({ matches: incoming.matches, fetchedAt, source: incoming.source });
       const next = applyFeedUpdate(snapshot.current, incoming.matches);
       setMatches(next.matches);
-      setPredictions(next.predictions);
-      setGroups(next.groups);
-      setLocalPlayer(next.player);
+      if (!isSupabaseConfigured) {
+        setPredictions(next.predictions);
+        setGroups(next.groups);
+        setLocalPlayer(next.player);
+      }
       setFeedUpdatedAt(fetchedAt);
       setFeedStatus('live');
+      if (user) {
+        await pushSchedule(incoming.matches);
+        await refresh();
+      }
     } catch (error) {
       setFeedStatus(cache ? 'cached' : 'error');
       notify({
@@ -162,10 +158,13 @@ export function AppProvider({ children }: React.PropsWithChildren) {
         message: error instanceof Error ? error.message : 'Calendrier indisponible pour le moment.',
       });
     }
-  }, [notify, refresh]);
+  }, [notify, refresh, user]);
 
   useEffect(() => {
-    if (isSupabaseConfigured) return;
+    if (isSupabaseConfigured) {
+      setDemoReady(true);
+      return;
+    }
     const stored = readDemoStore();
     const cache = readFeedCache();
     if (stored) {
@@ -184,7 +183,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!demoReady || isSupabaseConfigured) return;
+    if (!demoReady) return;
     void syncMatches(false);
   }, [demoReady, syncMatches]);
 
@@ -222,10 +221,10 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   }, [notice]);
 
   const player = useMemo<Player>(() => {
-    if (!user) return localPlayer;
+    if (!user) return isSupabaseConfigured ? guestPlayer : localPlayer;
     if (remotePlayer) return remotePlayer;
     return {
-      ...localPlayer,
+      ...guestPlayer,
       id: user.id,
       username: String(user.user_metadata.username ?? user.email?.split('@')[0] ?? 'Invocateur'),
     };
@@ -239,16 +238,25 @@ export function AppProvider({ children }: React.PropsWithChildren) {
 
   const signUp = async (email: string, password: string, username: string): Promise<AuthResult> => {
     if (!supabase) return { error: 'Ajoute les clés Supabase pour activer les comptes.' };
-    const { error } = await supabase.auth.signUp({
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { username } },
+      options: {
+        data: { username: username.trim() },
+        emailRedirectTo: origin,
+      },
     });
-    return error ? { error: error.message } : {};
+    if (error) return { error: error.message };
+    if (!data.session) return { pending: true };
+    return {};
   };
 
   const signOut = async () => {
     if (supabase) await supabase.auth.signOut();
+    setRemotePlayer(null);
+    setPredictions([]);
+    setGroups([]);
   };
 
   const savePrediction = async (
@@ -270,11 +278,20 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       createdAt: new Date().toISOString(),
     };
 
+    if (isSupabaseConfigured && !user) {
+      return { error: 'Crée un compte pour enregistrer ton prono.' };
+    }
+
     if (!supabase || !user) {
       setPredictions((items) => [...items.filter((item) => item.matchId !== match.id), prediction]);
       return {};
     }
 
+    try {
+      await pushSchedule([match]);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Match introuvable côté ligue.' };
+    }
     const { error } = await supabase.from('predictions').upsert(
       {
         match_id: match.id,
@@ -290,6 +307,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   };
 
   const createGroup = async (name: string) => {
+    if (isSupabaseConfigured && !user) return { error: 'Connecte-toi pour créer une ligue.' };
     if (!supabase || !user) {
       const code = Math.random().toString(36).slice(2, 8).toUpperCase();
       setGroups((items) => [...items, { id: code, name, code, members: [player] }]);
@@ -302,6 +320,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
 
   const joinGroup = async (code: string) => {
     const normalizedCode = normalizeInviteCode(code);
+    if (isSupabaseConfigured && !user) return { error: 'Connecte-toi pour rejoindre une ligue.' };
     if (!supabase || !user) {
       const target = groups.find((group) => group.code === normalizedCode);
       if (!target) return { error: 'Code introuvable en mode démo.' };
@@ -341,9 +360,15 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     return error ? { error: error.message } : {};
   };
 
-  const updateUsername = (username: string): AuthResult => {
+  const updateUsername = async (username: string): Promise<AuthResult> => {
     const clean = username.trim().slice(0, 24);
     if (clean.length < 2) return { error: 'Le pseudo doit faire au moins 2 caractères.' };
+    if (supabase && user) {
+      const { error } = await supabase.from('profiles').update({ username: clean }).eq('id', user.id);
+      if (error) return { error: error.message };
+      await refresh();
+      return {};
+    }
     setLocalPlayer((current) => ({ ...current, username: clean }));
     setGroups((items) =>
       items.map((group) => ({

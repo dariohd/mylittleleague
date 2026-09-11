@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { layout, palette } from '@/constants/theme';
 import { useApp } from '@/providers/app-provider';
-import { AppText, Mascot, Pill } from './ui';
+import { AppText, Button, Mascot, Pill } from './ui';
 
 const navItems = [
   { label: 'QG', href: '/', icon: House },
@@ -86,7 +86,7 @@ export function AppShell({
 }: React.PropsWithChildren<{ title?: string; eyebrow?: string; noScroll?: boolean }>) {
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
-  const { demoMode, player, notice, clearNotice, feedStatus } = useApp();
+  const { demoMode, player, notice, clearNotice, feedStatus, user } = useApp();
 
   const body = (
     <View style={styles.content}>
@@ -97,6 +97,12 @@ export function AppShell({
             <Pill color={palette.acid} dark>CALENDRIER LIVE</Pill>
           ) : demoMode ? (
             <Pill color={palette.cyan}>MODE DÉMO</Pill>
+          ) : null}
+          {!user ? (
+            <>
+              <Button label="CONNEXION" variant="ghost" onPress={() => router.push('/auth')} />
+              <Button label="CRÉER UN COMPTE" onPress={() => router.push('/auth?mode=signup')} />
+            </>
           ) : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir le profil" style={styles.profile} onPress={() => router.push('/profile')}>
             <View style={[styles.avatar, { backgroundColor: player.color }]}>

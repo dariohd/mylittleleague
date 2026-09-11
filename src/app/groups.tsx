@@ -11,7 +11,7 @@ import { useApp } from '@/providers/app-provider';
 import type { Group } from '@/types';
 
 export default function GroupsScreen() {
-  const { groups, createGroup, joinGroup, notify } = useApp();
+  const { groups, createGroup, joinGroup, notify, user, demoMode } = useApp();
   const [mode, setMode] = useState<'closed' | 'create' | 'join'>('closed');
   const [value, setValue] = useState('');
 
@@ -39,8 +39,27 @@ export default function GroupsScreen() {
           <AppText color={palette.muted}>Crée une ligue, balance le code dans le groupe et règle vos débats avec des points.</AppText>
         </View>
         <View style={styles.actions}>
-          <Button label="CRÉER UNE LIGUE" onPress={() => setMode('create')} />
-          <Button label="REJOINDRE" variant="ghost" onPress={() => setMode('join')} />
+          <Button
+            label="CRÉER UNE LIGUE"
+            onPress={() => {
+              if (!demoMode && !user) {
+                router.push('/auth?mode=signup');
+                return;
+              }
+              setMode('create');
+            }}
+          />
+          <Button
+            label="REJOINDRE"
+            variant="ghost"
+            onPress={() => {
+              if (!demoMode && !user) {
+                router.push('/auth?mode=signup');
+                return;
+              }
+              setMode('join');
+            }}
+          />
         </View>
       </View>
 
@@ -62,6 +81,13 @@ export default function GroupsScreen() {
             <Button label="ANNULER" variant="ghost" onPress={() => setMode('closed')} />
             <Button label="VALIDER" disabled={!value.trim()} onPress={submit} />
           </View>
+        </Card>
+      ) : null}
+
+      {!demoMode && !user ? (
+        <Card>
+          <AppText variant="h2">UN COMPTE POUR JOUER ENSEMBLE</AppText>
+          <AppText color={palette.muted}>Sans compte, chacun reste tout seul dans son navigateur. Inscris-toi, puis envoie le code de ligue à tes amis.</AppText>
         </Card>
       ) : null}
 

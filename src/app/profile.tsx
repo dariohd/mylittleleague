@@ -24,7 +24,7 @@ export default function ProfileScreen() {
         <View style={styles.identityCopy}>
           <AppText variant="h1">{player.username}</AppText>
           <Pill color={palette.grape}>{player.title}</Pill>
-          <AppText color={palette.muted}>{user?.email ?? 'Compte de démonstration local'}</AppText>
+          <AppText color={palette.muted}>{user?.email ?? (demoMode ? 'Compte de démonstration local' : 'Pas encore connecté')}</AppText>
         </View>
       </Card>
       <View style={styles.grid}>
@@ -33,7 +33,7 @@ export default function ProfileScreen() {
         <Card style={styles.stat}><AppText variant="h1" color={palette.coral}>{player.streak}</AppText><AppText variant="label">SÉRIE</AppText></Card>
       </View>
 
-      {demoMode ? (
+      {demoMode || user ? (
         <Card style={styles.edit} accent={palette.acid}>
           <AppText variant="h2">CHANGER DE PSEUDO</AppText>
           <Field label="Pseudo" value={username} onChangeText={setUsername} maxLength={24} />
@@ -41,13 +41,20 @@ export default function ProfileScreen() {
             label="ENREGISTRER"
             disabled={username.trim() === player.username}
             onPress={() => {
-              const result = updateUsername(username);
-              if (result.error) notify({ kind: 'error', title: 'Pseudo refusé', message: result.error });
-              else notify({ kind: 'ok', title: 'Pseudo mis à jour', message: 'Le classement te reconnaîtra.' });
+              void updateUsername(username).then((result) => {
+                if (result.error) notify({ kind: 'error', title: 'Pseudo refusé', message: result.error });
+                else notify({ kind: 'ok', title: 'Pseudo mis à jour', message: 'Le classement te reconnaîtra.' });
+              });
             }}
           />
         </Card>
-      ) : null}
+      ) : (
+        <Card style={styles.edit} accent={palette.acid}>
+          <AppText variant="h2">CRÉE TON PROFIL</AppText>
+          <AppText color={palette.muted}>Un compte gratuit garde tes pronos et te met dans le classement de tes ligues.</AppText>
+          <Button label="CRÉER UN COMPTE" onPress={() => router.push('/auth?mode=signup')} />
+        </Card>
+      )}
 
       <Card style={styles.history}>
         <AppText variant="h2">HISTORIQUE DES PRONOS</AppText>
@@ -74,9 +81,15 @@ export default function ProfileScreen() {
           <Settings2 color={palette.muted} />
           <View style={{ flex: 1 }}>
             <AppText variant="h2">COMPTE ET APPLICATION</AppText>
-            <AppText color={palette.muted}>{demoMode ? 'Connecte Supabase pour jouer en ligne avec tes amis.' : 'Ton compte est synchronisé sur tous tes appareils.'}</AppText>
+            <AppText color={palette.muted}>
+              {demoMode
+                ? 'Connecte Supabase pour jouer en ligne avec tes amis.'
+                : user
+                  ? 'Ton compte est synchronisé sur tous tes appareils.'
+                  : 'Crée un compte pour garder tes pronos et rejoindre une ligue.'}
+            </AppText>
           </View>
-          {demoMode ? <Button label="SE CONNECTER" onPress={() => router.push('/auth')} /> : null}
+          {!user ? <Button label="SE CONNECTER" onPress={() => router.push('/auth')} /> : null}
         </View>
         {isAdmin ? (
           <View style={styles.settingRow}>

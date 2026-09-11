@@ -13,7 +13,7 @@ import { useApp } from '@/providers/app-provider';
 
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { matches, predictions, savePrediction, notify } = useApp();
+  const { matches, predictions, savePrediction, notify, user, demoMode } = useApp();
   const match = matches.find((item) => item.id === id);
   const current = predictions.find((item) => item.matchId === id);
   const [score, setScore] = useState<[number, number] | null>(
@@ -138,7 +138,11 @@ export default function MatchDetailScreen() {
               <AppText variant="small">Bon vainqueur : 3 points</AppText>
               <AppText variant="small">Score exact : +2 points</AppText>
             </View>
-            <Button label={current ? 'MODIFIER MON PRONO' : 'VALIDER MON PRONO'} disabled={!score} loading={saving} onPress={submit} />
+            {!demoMode && !user ? (
+              <Button label="CRÉER UN COMPTE POUR PRONO" onPress={() => router.push('/auth?mode=signup')} />
+            ) : (
+              <Button label={current ? 'MODIFIER MON PRONO' : 'VALIDER MON PRONO'} disabled={!score} loading={saving} onPress={submit} />
+            )}
           </>
         )}
       </Card>

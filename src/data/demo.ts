@@ -104,6 +104,16 @@ export const currentPlayer: Player = {
   color: '#C7F43D',
 };
 
+export const guestPlayer: Player = {
+  id: 'guest',
+  username: 'Invité',
+  title: 'Rookie de la Faille',
+  points: 0,
+  exactScores: 0,
+  streak: 0,
+  color: '#C7F43D',
+};
+
 export const rivals: Player[] = [
   currentPlayer,
   { id: 'p2', username: 'Choky', title: 'Draft suspecte', points: 39, exactScores: 4, streak: 1, color: '#56DDE8' },

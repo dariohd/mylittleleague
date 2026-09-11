@@ -38,15 +38,23 @@ npx supabase link --project-ref TON_PROJECT_REF
 npx supabase db push
 ```
 
-3. Copie `.env.example` vers `.env` et renseigne l’URL ainsi que la clé publiable.
-4. Définis le secret de synchronisation et déploie la fonction :
+3. Dans Authentication > URL Configuration, mets `https://mylittleleague.vercel.app` comme Site URL. Pour un test entre amis, tu peux désactiver la confirmation d’email.
+4. Copie `.env.example` vers `.env` et renseigne l’URL ainsi que la clé publiable (`EXPO_PUBLIC_SUPABASE_URL` et `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`).
+5. Ajoute les mêmes variables sur Vercel (Production et Preview). Expo les injecte au build, donc un redéploiement est obligatoire après les avoir collées.
+
+```powershell
+npx vercel env add EXPO_PUBLIC_SUPABASE_URL production preview development
+npx vercel env add EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY production preview development
+```
+
+6. Définis le secret de synchronisation et déploie la fonction :
 
 ```powershell
 npx supabase secrets set SYNC_SECRET="UN_SECRET_LONG_ET_ALEATOIRE"
 npx supabase functions deploy sync-leaguepedia --no-verify-jwt
 ```
 
-5. Déclenche une première synchronisation :
+7. Déclenche une première synchronisation :
 
 ```powershell
 curl.exe -X POST "https://TON_PROJECT_REF.supabase.co/functions/v1/sync-leaguepedia" -H "x-sync-secret: UN_SECRET_LONG_ET_ALEATOIRE"

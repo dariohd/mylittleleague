@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -10,7 +10,8 @@ import { useApp } from '@/providers/app-provider';
 
 export default function AuthScreen() {
   const { signIn, signUp, demoMode, notify } = useApp();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<'signin' | 'signup'>(params.mode === 'signup' ? 'signup' : 'signin');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,10 +27,19 @@ export default function AuthScreen() {
       notify({ kind: 'error', title: 'Connexion impossible', message: result.error });
       return;
     }
+    if (result.pending) {
+      notify({
+        kind: 'ok',
+        title: 'Compte créé',
+        message: 'Vérifie ton email pour confirmer, puis reconnecte-toi.',
+      });
+      setMode('signin');
+      return;
+    }
     notify({
       kind: 'ok',
       title: mode === 'signin' ? 'Bon retour' : 'Compte créé',
-      message: mode === 'signup' ? 'Vérifie ton email si la confirmation est activée.' : 'La compétition reprend.',
+      message: 'Tu peux pronostiquer et créer une ligue avec tes amis.',
     });
     router.replace('/');
   };
@@ -38,24 +48,28 @@ export default function AuthScreen() {
     <AppShell>
       <View style={styles.page}>
         <View style={styles.pitch}>
-          <Pill color={palette.coral}>ESPACE PRIVÉ</Pill>
+          <Pill color={palette.coral}>ENTRE POTES</Pill>
           <AppText variant="display">RAMÈNE{'\n'}TA BANDE.</AppText>
-          <AppText color={palette.muted}>Un compte gratuit suffit pour rejoindre tes amis, conserver tes pronos et grimper au classement.</AppText>
+          <AppText color={palette.muted}>Un compte gratuit suffit pour rejoindre tes amis, conserver tes pronos et partager un classement.</AppText>
           <Mascot size={120} />
         </View>
         <Card style={styles.form} accent={palette.acid}>
           <ShieldCheck color={palette.acid} size={30} />
           <AppText variant="h1">{mode === 'signin' ? 'CONNEXION' : 'INSCRIPTION'}</AppText>
-          {demoMode ? <AppText variant="small" color={palette.coral}>Supabase n’est pas encore configuré. Le formulaire sera actif dès que les variables d’environnement seront renseignées.</AppText> : null}
+          {demoMode ? (
+            <AppText variant="small" color={palette.coral}>
+              Les comptes en ligne ne sont pas encore branchés sur cet environnement.
+            </AppText>
+          ) : null}
           {mode === 'signup' ? (
-            <Field label="Pseudo" value={username} onChangeText={setUsername} placeholder="MacroGénie" autoCapitalize="none" />
+            <Field label="Pseudo" value={username} onChangeText={setUsername} placeholder="Ton pseudo" autoCapitalize="none" />
           ) : null}
           <Field label="Email" value={email} onChangeText={setEmail} placeholder="toi@exemple.fr" autoCapitalize="none" keyboardType="email-address" />
           <Field label="Mot de passe" value={password} onChangeText={setPassword} placeholder="8 caractères minimum" secureTextEntry />
           <Button
-            label={mode === 'signin' ? 'ENTRER DANS L’ARÈNE' : 'CRÉER MON COMPTE'}
+            label={mode === 'signin' ? 'SE CONNECTER' : 'CRÉER MON COMPTE'}
             loading={loading}
-            disabled={!email || password.length < 8 || (mode === 'signup' && username.length < 2)}
+            disabled={demoMode || !email || password.length < 8 || (mode === 'signup' && username.length < 2)}
             onPress={submit}
           />
           <Button
