@@ -189,7 +189,7 @@ export function TeamMark({ team, size = 48 }: { team: Team; size?: number }) {
   );
 }
 
-export function GlitchMascot({ size = 96 }: { size?: number }) {
+export function Mascot({ size = 96 }: { size?: number }) {
   return (
     <View style={{ width: size, height: size }}>
       <View

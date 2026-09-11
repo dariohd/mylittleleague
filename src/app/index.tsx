@@ -4,11 +4,11 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
 import { MatchCard } from '@/components/match-card';
-import { AppText, Button, Card, GlitchMascot, Pill } from '@/components/ui';
+import { AppText, Button, Card, Mascot, Pill } from '@/components/ui';
 import { palette } from '@/constants/theme';
 import { resolvedStatus } from '@/lib/format';
 import { isLiveFeedMatch } from '@/lib/leaguepedia';
-import { glitchQuip } from '@/lib/titles';
+import { homeQuip } from '@/lib/titles';
 import { useApp } from '@/providers/app-provider';
 
 export default function HomeScreen() {
@@ -20,7 +20,7 @@ export default function HomeScreen() {
   const finished = matches.filter((match) => match.status === 'finished');
   const pending = open.filter((match) => !predictions.some((item) => item.matchId === match.id)).length;
   const missed = finished.filter((match) => !predictions.some((item) => item.matchId === match.id)).length;
-  const quip = glitchQuip({ streak: player.streak, pending, missed });
+  const quip = homeQuip({ streak: player.streak, pending, missed });
   const spotlight = [...live, ...open].slice(0, 8);
 
   return (
@@ -41,7 +41,7 @@ export default function HomeScreen() {
           </View>
         </View>
         <View style={[styles.mascotStage, compact && styles.mascotStageCompact]}>
-          <View style={styles.mascotCircle}><GlitchMascot size={150} /></View>
+          <View style={styles.mascotCircle}><Mascot size={150} /></View>
           <View style={styles.speech}><AppText variant="label" color={palette.ink}>{quip}</AppText></View>
         </View>
       </View>

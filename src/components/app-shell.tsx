@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { layout, palette } from '@/constants/theme';
 import { useApp } from '@/providers/app-provider';
-import { AppText, GlitchMascot, Pill } from './ui';
+import { AppText, Mascot, Pill } from './ui';
 
 const navItems = [
   { label: 'QG', href: '/', icon: House },
@@ -127,8 +127,8 @@ export function AppShell({
             <Logo />
             <View style={styles.nav}>{navItems.map((item) => <NavButton key={item.href} item={item} />)}</View>
             <View style={styles.sidebarMascot}>
-              <GlitchMascot size={74} />
-              <AppText variant="small">GLITCH surveille tes takes douteuses.</AppText>
+              <Mascot size={74} />
+              <AppText variant="small">Pronostics LoL entre amis.</AppText>
             </View>
           </View>
         ) : null}

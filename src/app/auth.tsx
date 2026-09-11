@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
-import { AppText, Button, Card, Field, GlitchMascot, Pill } from '@/components/ui';
+import { AppText, Button, Card, Field, Mascot, Pill } from '@/components/ui';
 import { palette } from '@/constants/theme';
 import { useApp } from '@/providers/app-provider';
 
@@ -41,7 +41,7 @@ export default function AuthScreen() {
           <Pill color={palette.coral}>ESPACE PRIVÉ</Pill>
           <AppText variant="display">RAMÈNE{'\n'}TA BANDE.</AppText>
           <AppText color={palette.muted}>Un compte gratuit suffit pour rejoindre tes amis, conserver tes pronos et grimper au classement.</AppText>
-          <GlitchMascot size={120} />
+          <Mascot size={120} />
         </View>
         <Card style={styles.form} accent={palette.acid}>
           <ShieldCheck color={palette.acid} size={30} />

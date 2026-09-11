@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { countdownTo, matchClockLabel, pointsLabel, resolvedStatus } from './format';
-import { glitchQuip, titleForStats } from './titles';
+import { homeQuip, titleForStats } from './titles';
 
 describe('countdownTo', () => {
   it('affiche les minutes sous une heure', () => {
@@ -30,8 +30,8 @@ describe('titleForStats', () => {
   });
 });
 
-describe('glitchQuip', () => {
+describe('homeQuip', () => {
   it('rappelle les pronos ouverts', () => {
-    expect(glitchQuip({ streak: 0, pending: 2, missed: 0 })).toContain('2 PRONOS');
+    expect(homeQuip({ streak: 0, pending: 2, missed: 0 })).toContain('2 PRONOS');
   });
 });

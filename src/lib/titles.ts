@@ -13,10 +13,10 @@ export function titleForStats(points: number, streak = 0) {
   return rung?.title ?? TITLE_LADDER[0].title;
 }
 
-export function glitchQuip(input: { streak: number; pending: number; missed: number }) {
+export function homeQuip(input: { streak: number; pending: number; missed: number }) {
   if (input.pending > 0) {
     return input.pending === 1
-      ? '1 PRONO EN SUSPENS. GLITCH JUGE.'
+      ? '1 PRONO EN SUSPENS. ON ATTEND.'
       : `${input.pending} PRONOS EN SUSPENS. ON ATTEND.`;
   }
   if (input.streak >= 3) return 'SÉRIE EN COURS. NE CASSE RIEN.';
