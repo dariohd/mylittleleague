@@ -1,56 +1,100 @@
-# Welcome to your Expo app 👋
+# My Little League
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application gratuite de pronostics League of Legends esport pour jouer entre amis. Aucun argent, aucune mise et aucune récompense convertible : uniquement des points, des badges cosmétiques et le droit de chambrer le classement.
 
-## Get started
+Une seule base Expo alimente le Web, Android et iOS. Supabase fournit l’authentification, PostgreSQL, les règles de sécurité et les fonctions serveur.
 
-1. Install dependencies
+## Lancer la démo
 
-   ```bash
-   npm install
-   ```
+Prérequis : Node.js 22.13 ou plus récent.
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+npm install
+npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Le site public est sur [mylittleleague.vercel.app](https://mylittleleague.vercel.app). Chaque push sur `main` redéploie.
 
-### Other setup steps
+Sans variables Supabase, l’application démarre en mode local et synchronise le calendrier pro depuis le flux public de lolesports.com (LEC, LCK, LPL, LFL, Worlds, ligues régionales, etc.). Leaguepedia est interrogé en complément quand Fandom ne bride pas le débit. LoLix.gg n’expose pas d’API publique, donc il n’est pas utilisé.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Les pronostics restent utilisables localement. Un cache de 20 minutes évite de marteler les sources.
 
-## Learn more
+Pour un téléphone :
 
-To learn more about developing your project with Expo, look at the following resources:
+```powershell
+npm start
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Scanne le QR code avec Expo Go, ou appuie sur `a` pour ouvrir un émulateur Android.
 
-## Join the community
+## Activer le jeu en ligne
 
-Join our community of developers creating universal apps.
+1. Crée un projet gratuit sur [Supabase](https://supabase.com).
+2. Installe la CLI Supabase puis connecte le projet :
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```powershell
+npx supabase login
+npx supabase link --project-ref TON_PROJECT_REF
+npx supabase db push
+```
+
+3. Copie `.env.example` vers `.env` et renseigne l’URL ainsi que la clé publiable.
+4. Définis le secret de synchronisation et déploie la fonction :
+
+```powershell
+npx supabase secrets set SYNC_SECRET="UN_SECRET_LONG_ET_ALEATOIRE"
+npx supabase functions deploy sync-leaguepedia --no-verify-jwt
+```
+
+5. Déclenche une première synchronisation :
+
+```powershell
+curl.exe -X POST "https://TON_PROJECT_REF.supabase.co/functions/v1/sync-leaguepedia" -H "x-sync-secret: UN_SECRET_LONG_ET_ALEATOIRE"
+```
+
+Programme ensuite cette requête toutes les 30 à 60 minutes depuis Supabase Cron. Cette fréquence respecte mieux la limite agressive du flux Leaguepedia. La fonction conserve toujours les dernières données valides si la source tombe en panne.
+
+## Donner le rôle admin
+
+Après avoir créé ton compte, exécute ceci dans le SQL Editor Supabase en remplaçant l’email :
+
+```sql
+update public.profiles
+set is_admin = true
+where id = (select id from auth.users where email = 'ton@email.fr');
+```
+
+L’espace admin permet de corriger un résultat absent ou erroné. Une correction déclenche le même calcul idempotent que le flux automatique.
+
+## Règles
+
+- Le pronostic est modifiable jusqu’à l’heure exacte du match.
+- Bon vainqueur : 3 points.
+- Score exact : 2 points supplémentaires.
+- Les résultats et points sont calculés côté base, jamais dans le client.
+- Les groupes privés se rejoignent avec un code à 6 caractères.
+
+## Qualité
+
+```powershell
+npm run typecheck
+npm test
+npx expo export --platform web
+```
+
+## Builds mobiles
+
+Installe EAS CLI et connecte un compte Expo :
+
+```powershell
+npm install -g eas-cli
+eas login
+eas build --profile preview --platform android
+eas build --profile production --platform all
+```
+
+Le profil `preview` produit un APK Android partageable. La publication sur Google Play ou l’App Store exige les comptes développeur correspondants. EAS permet de compiler iOS sans posséder de Mac.
+
+## Données et marque
+
+Les calendriers et résultats proviennent du site public lolesports.com et de Leaguepedia (licence CC BY-SA). LoLix.gg n’est pas branché : le site n’offre pas d’API. Les écussons et la mascotte sont des créations originales. My Little League est une application communautaire indépendante, non approuvée et non affiliée à Riot Games. League of Legends et Riot Games appartiennent à Riot Games, Inc.

@@ -1,0 +1,25 @@
+project_id = "my-little-league"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+additional_redirect_urls = ["mylittleleague://**", "http://localhost:8081/**"]
+enable_signup = true
+
+[functions.sync-leaguepedia]
+verify_jwt = false
